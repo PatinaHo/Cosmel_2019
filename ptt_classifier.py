@@ -42,7 +42,7 @@ def main():
     sent_train, sent_test, ans_train, ans_test = train_test_split(all_ptt_sent_idx, all_ans, test_size=0.3, random_state=1)
     sent_train, sent_val, ans_train, ans_val = train_test_split(sent_train, ans_train, test_size=0.2, random_state=1)
 
-    best_model = train_and_eval(num_model_to_train=5, training_set=sent_train, training_ans=ans_train, eval_set=sent_val, eval_ans=ans_val)
+    best_model = train_and_eval(num_model_to_train=5, training_set=sent_train, training_ans=ans_train, eval_set=sent_val, eval_ans=ans_val, embedding=embedding)
     torch.save(best_model.state_dict(), './model1.pt')
     
 
@@ -131,7 +131,7 @@ def inputVar(input_batch, embedding):
     padVar = torch.stack([embedding(torch.LongTensor(item)) for item in padList], dim=0)
     return padVar, lengths
 
-def batch_grouping(batch_size, input_tensors, outputs, drop_last=True):
+def batch_grouping(batch_size, input_tensors, outputs, embedding, drop_last=True):
     assert len(input_tensors) == len(outputs), 'LEN NOT MATCH! YOU IDIOT!!!'
     
     num_data = len(input_tensors)
@@ -144,7 +144,7 @@ def batch_grouping(batch_size, input_tensors, outputs, drop_last=True):
         input_batch = input_tensors[idx0:idx1]
         output_batch = outputs[idx0:idx1]
             
-        inp, input_lengths = inputVar(input_batch)
+        inp, input_lengths = inputVar(input_batch, embedding=embedding)
         out = torch.LongTensor(output_batch)
         
         assert inp.shape[1] == input_lengths.shape[0] == out.shape[0]
@@ -196,7 +196,7 @@ class MyModel(nn.Module):
 
 
 def train_model(n_hidden=128, n_categories=2, print_every=500, plot_every=500, *, training_set, training_ans, batch_size, embedding, epochs):
-    batches = batch_grouping(batch_size=batch_size, input_tensors=training_set, outputs=training_ans)
+    batches = batch_grouping(batch_size=batch_size, input_tensors=training_set, outputs=training_ans, embedding=embedding)
     model = MyModel(WORD_DIM, n_hidden, n_categories)
     model.cuda()
     optimizer = optim.Adam(model.parameters())
@@ -232,10 +232,10 @@ def train_model(n_hidden=128, n_categories=2, print_every=500, plot_every=500, *
     return model, all_losses
 
 
-def eval_model(n_hidden=128, n_categories=2, print_every=5, *, model, eval_set, eval_ans, batch_size):
+def eval_model(n_hidden=128, n_categories=2, print_every=5, *, model, eval_set, eval_ans, batch_size, embedding):
     total_loss = 0
     model.eval()
-    batches = batch_grouping(batch_size=batch_size, input_tensors=eval_set, outputs=eval_ans, drop_last=False)
+    batches = batch_grouping(batch_size=batch_size, input_tensors=eval_set, outputs=eval_ans, embedding=embedding, drop_last=False)
     
     start = time.time()
     prediction_all = np.array([])
@@ -271,7 +271,7 @@ def train_and_eval(num_model_to_train, training_set, training_ans, eval_set, eva
     print()
     print("Start evaluating ...")
     for j in range(len(models)):
-        acc, loss = eval_model(model=models[j], eval_set=eval_set, eval_ans=eval_ans, batch_size=128)
+        acc, loss = eval_model(model=models[j], eval_set=eval_set, eval_ans=eval_ans, batch_size=128, embedding=embedding)
         print("Model%d evaluated. Loss: %4f; accuracy: %4f" % (j, loss, acc))
         eval_losses.append(loss)
         

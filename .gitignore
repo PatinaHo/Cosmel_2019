@@ -1,0 +1,6 @@
+# .gitignore
+
+
+data/*
+jupyter_nb/*
+article/*
